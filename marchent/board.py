@@ -47,6 +47,50 @@ def ortho_marcher(marcher: Marcher) -> Marcher:
     return new_marcher
 
 
+def unbalanced_ortho_marcher(marcher: Marcher) -> Marcher:
+    new_marcher = Marcher(**marcher.__dict__)
+    x = marcher.move_transitions.copy()
+    if np.random.rand() > .95:
+        x[:, 0] = marcher.move_transitions[:, 2]
+        x[:, 1] = marcher.move_transitions[:, 3]
+        x[:, 2] = marcher.move_transitions[:, 1]
+        x[:, 3] = marcher.move_transitions[:, 0]
+    else:
+        x[:, 0] = marcher.move_transitions[:, 3]
+        x[:, 1] = marcher.move_transitions[:, 2]
+        x[:, 2] = marcher.move_transitions[:, 0]
+        x[:, 3] = marcher.move_transitions[:, 1]
+    new_marcher.move_transitions = x
+    new_marcher.color = max(int(new_marcher.color * .9), 1)
+    return new_marcher
+
+
+def unbalanced_ortho_marcher_faster_spawn(marcher: Marcher) -> Marcher:
+    new_marcher = Marcher(**marcher.__dict__)
+    x = marcher.move_transitions.copy()
+    if np.random.rand() > .95:
+        x[:, 0] = marcher.move_transitions[:, 2]
+        x[:, 1] = marcher.move_transitions[:, 3]
+        x[:, 2] = marcher.move_transitions[:, 1]
+        x[:, 3] = marcher.move_transitions[:, 0]
+    else:
+        x[:, 0] = marcher.move_transitions[:, 3]
+        x[:, 1] = marcher.move_transitions[:, 2]
+        x[:, 2] = marcher.move_transitions[:, 0]
+        x[:, 3] = marcher.move_transitions[:, 1]
+    new_marcher.move_transitions = x
+
+    z = new_marcher.state_transitions.copy()
+    delta = np.random.rand() * z[:, 0] / 50
+    z[:, 0] -= delta
+    z[:, 1] += delta
+    z[:] = np.clip(z, 0, 1)
+    z /= z.sum(axis=1)[:, np.newaxis]
+    new_marcher.state_transitions = z
+    new_marcher.color = np.clip(new_marcher.color + np.random.choice([-2, 1]), 0, 255)
+    return new_marcher
+
+
 def perturbed_ortho_marcher(marcher: Marcher) -> Marcher:
     new_marcher = Marcher(**marcher.__dict__)
     x = marcher.move_transitions.copy()
