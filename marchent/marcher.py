@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Callable
 from enum import Enum
 
 import numpy as np
@@ -16,14 +17,19 @@ class Marcher:
     y: int
     move_transitions: np.ndarray  # (num global states) x 4
     state_transitions: np.ndarray  # (num global states) x (num marcher states)
-    color: int  # 0-255
+    color: np.ndarray  # (3,)
+
+    # these are used to create a new marcher on splitting
+    split_color: Callable[[np.ndarray], np.ndarray] = lambda c: c.copy()
+    split_move_transitions: Callable[[np.ndarray], np.ndarray] = lambda x: x.copy()
+    split_state_transitions: Callable[[np.ndarray], np.ndarray] = lambda x: x.copy()
 
     def __post_init__(self):
         assert self.move_transitions.shape[1] == 4  # 4 direction choices
         assert self.state_transitions.shape[1] == len(MarcherState)
-
-        # assert (self.move_transitions.sum(axis=1) == 1.).all()  # all valid probability distributions
-        # assert (self.state_transitions.sum(axis=1) == 1.).all()
+        assert (self.move_transitions.sum(axis=1) == 1.).all()  # all valid probability distributions
+        assert (self.state_transitions.sum(axis=1) == 1.).all()
+        assert self.color.shape == (3,)  # 3 channel color
 
     def step(self, state: int) -> MarcherState:
         move_choice = np.random.choice(4, p=self.move_transitions[state])
@@ -42,3 +48,36 @@ class Marcher:
                 p=self.state_transitions[state],
             )
         )
+
+    def split(self) -> "Marcher":
+        return Marcher(
+            x=self.x, y=self.y,
+            move_transitions=self.split_move_transitions(self.move_transitions),
+            state_transitions=self.split_state_transitions(self.state_transitions),
+            color=self.split_color(self.color),
+            split_move_transitions=self.split_move_transitions,
+            split_state_transitions=self.split_state_transitions,
+            split_color=self.split_color,
+        )
+
+
+# color rules
+def rand_color(c: np.ndarray=None) -> np.ndarray:
+    return np.random.randint(0, 256, size=3).astype(np.uint8)
+
+
+# move rules
+def ortho_split(x: np.ndarray) -> np.ndarray:
+    z = x.copy()
+    if np.random.rand() > .5:
+        z[:, 0] = x[:, 2]
+        z[:, 1] = x[:, 3]
+        z[:, 2] = x[:, 1]
+        z[:, 3] = x[:, 0]
+    else:
+        z[:, 0] = x[:, 3]
+        z[:, 1] = x[:, 2]
+        z[:, 2] = x[:, 0]
+        z[:, 3] = x[:, 1]
+    return z
+
