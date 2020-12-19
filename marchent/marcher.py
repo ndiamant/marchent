@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, List
 from enum import Enum
 import colorsys
 
@@ -10,6 +10,10 @@ class MarcherState(Enum):
     RUNNING = 0
     SPLITTING = 1
     STOPPING = 2
+
+
+def assert_valid_distribution(x: np.ndarray):
+    np.testing.assert_allclose(x.sum(axis=1), 1)
 
 
 @dataclass
@@ -28,8 +32,8 @@ class Marcher:
     def __post_init__(self):
         assert self.move_transitions.shape[1] == 4  # 4 direction choices
         assert self.state_transitions.shape[1] == len(MarcherState)
-        assert (self.move_transitions.sum(axis=1) == 1.).all()  # all valid probability distributions
-        assert (self.state_transitions.sum(axis=1) == 1.).all()
+        assert_valid_distribution(self.move_transitions)
+        assert_valid_distribution(self.state_transitions)
         assert self.color.shape == (3,)  # 3 channel color
         assert not (self.color == 0).all()  # can't be collision color
 
@@ -62,6 +66,14 @@ class Marcher:
             split_color=self.split_color,
         )
 
+    @property
+    def expected_angle(self) -> np.ndarray:
+        """expected movement angle per global state measured in degrees"""
+        return np.arctan2(
+            self.move_transitions[:, 3] - self.move_transitions[:, 2],
+            self.move_transitions[:, 0] - self.move_transitions[:, 1]
+        ) / (2 * np.pi) * 360
+
 
 # color rules
 def rand_color(c: np.ndarray = None) -> np.ndarray:
@@ -76,10 +88,22 @@ def next_hsv(c: np.ndarray) -> np.ndarray:
     return (np.array([r, g, b]) * 255).astype(np.uint8)
 
 
+def lighten(c: np.ndarray) -> np.ndarray:
+    H, L, S = colorsys.rgb_to_hls(c[0] / 255, c[1] / 255, c[2] / 255)
+    L += .01 * (1 - L)
+    r, g, b = colorsys.hls_to_rgb(H, L, S)
+    return np.clip((np.array([r, g, b]) * 255).astype(np.uint8), 1, 255)
+
+
+def turn_color(c: np.ndarray, next_colors: List[np.ndarray]) -> np.ndarray:
+    return next_colors[np.random.randint(len(next_colors))]
+
+
 # move rules
 def ortho_split(x: np.ndarray) -> np.ndarray:
     z = x.copy()
     if np.random.rand() > .5:
+        # right, left, down, up
         z[:, 0] = x[:, 2]
         z[:, 1] = x[:, 3]
         z[:, 2] = x[:, 1]
@@ -91,3 +115,7 @@ def ortho_split(x: np.ndarray) -> np.ndarray:
         z[:, 3] = x[:, 1]
     return z
 
+
+def angle_split(x: np.ndarray, theta: float) -> np.ndarray:
+    ortho = ortho_split(x)
+    return np.sin(theta)**2 * ortho + np.cos(theta)**2 * x

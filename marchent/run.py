@@ -2,14 +2,18 @@ import os
 import argparse
 import numpy as np
 from typing import Callable, List
+from functools import partial
 
 from marchent.marcher import (
     Marcher,
     # color rules
     rand_color,
     next_hsv,
+    lighten,
+    turn_color,
     # move rules
     ortho_split,
+    angle_split,
 )
 from marchent.board import (
     draw_board,
@@ -93,10 +97,64 @@ def bacteria_rainbow() -> Board:
     )
 
 
+def tree() -> Board:
+    h = 500
+    w = 1000
+    marcher_pairs = [
+        [
+            Marcher(
+                i, j,
+                color=np.array([90, 90, 30]).astype(np.uint8),
+                state_transitions=np.array([
+                    [1, 0, 0],  # run, split, stop
+                    [.5, .5, 0],  # run, split, stop
+                ]),
+                move_transitions=np.array([
+                    [.0, .03, 0, .97],  # right, left, down, up
+                    [0, .2, 0, .8],  # right, left, down, up
+                ]),
+                split_color=partial(turn_color, next_colors=[
+                    np.array([10, np.random.randint(128), 10]).astype(np.uint8)
+                    for _ in range(5)
+                ]),
+                split_move_transitions=partial(angle_split, theta=np.pi / 20),
+            ),
+            Marcher(
+                i + 1, j,
+                color=np.array([90, 90, 30]).astype(np.uint8),
+                state_transitions=np.array([
+                    [1, .0, 0],  # run, split, stop
+                    [.5, .5, 0],  # run, split, stop
+                ]),
+                move_transitions=np.array([
+                    [.03, .0, 0, .97],  # right, left, down, up
+                    [.2, 0, 0, .8],  # right, left, down, up
+                ]),
+                split_color=partial(turn_color, next_colors=[
+                    np.array([10, np.random.randint(128), 10]).astype(np.uint8)
+                    for _ in range(5)
+                ]),
+                split_move_transitions=partial(angle_split, theta=np.pi / 20),
+                ),
+            ]
+        for i in range(0, w, 30)
+        for j in [h - 1, h // 2]
+    ]
+    marchers = sum(marcher_pairs, [])
+    states = [0] * 75 + [1] * 500
+    return Board(
+        width=w,
+        height=h,
+        states=states,
+        marchers=marchers,
+    )
+
+
 EXAMPLES: List[Callable[[], Board]] = [
     ortho_color,
     ortho_rainbow,
     bacteria_rainbow,
+    tree,
 ]
 
 
