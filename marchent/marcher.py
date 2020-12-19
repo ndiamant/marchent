@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Callable
 from enum import Enum
+import colorsys
 
 import numpy as np
 
@@ -30,6 +31,7 @@ class Marcher:
         assert (self.move_transitions.sum(axis=1) == 1.).all()  # all valid probability distributions
         assert (self.state_transitions.sum(axis=1) == 1.).all()
         assert self.color.shape == (3,)  # 3 channel color
+        assert not (self.color == 0).all()  # can't be collision color
 
     def step(self, state: int) -> MarcherState:
         move_choice = np.random.choice(4, p=self.move_transitions[state])
@@ -62,8 +64,16 @@ class Marcher:
 
 
 # color rules
-def rand_color(c: np.ndarray=None) -> np.ndarray:
+def rand_color(c: np.ndarray = None) -> np.ndarray:
     return np.random.randint(0, 256, size=3).astype(np.uint8)
+
+
+def next_hsv(c: np.ndarray) -> np.ndarray:
+    h, s, v = colorsys.rgb_to_hls(c[0] / 255, c[1] / 255, c[2] / 255)
+    h += .05
+    h %= 1
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+    return (np.array([r, g, b]) * 255).astype(np.uint8)
 
 
 # move rules
